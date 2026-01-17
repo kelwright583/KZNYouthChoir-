@@ -31,8 +31,8 @@ export async function GET() {
 
     // Filter out any invalid slides and ensure imageUrl exists
     const validSlides = slides
-      .filter((slide) => slide && slide.id)
-      .map((slide) => ({
+      .filter((slide: any) => slide && slide.id)
+      .map((slide: any) => ({
         id: slide.id,
         title: slide.title,
         subtitle: slide.subtitle,
