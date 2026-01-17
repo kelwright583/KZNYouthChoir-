@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@kzn-youth-choir/db'
-import { EventAudience } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 export async function GET(
   request: Request,
@@ -10,7 +10,7 @@ export async function GET(
     const event = await prisma.event.findUnique({
       where: {
         slug: params.slug,
-        audience: EventAudience.PUBLIC,
+        audience: Prisma.EventAudience.PUBLIC,
       },
       include: {
         attachments: true,

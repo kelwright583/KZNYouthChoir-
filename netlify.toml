@@ -1,5 +1,5 @@
 [build]
-  command = "pnpm install && pnpm build --filter=@kzn-youth-choir/public-site"
+  command = "pnpm install && cd packages/db && pnpm db:generate && cd ../.. && pnpm build --filter=@kzn-youth-choir/public-site"
   publish = "apps/public-site/.next"
 
 [[plugins]]
