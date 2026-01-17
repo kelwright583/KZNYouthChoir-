@@ -326,6 +326,7 @@ export function WhatToExpectModal({ isOpen, onClose, cardType }: WhatToExpectMod
                     }
                   }, 300)
                 }}
+                className="bg-[#3980b7] text-white hover:bg-[#3980b7]/90"
               >
                 Sign Up for Audition Updates
               </Button>

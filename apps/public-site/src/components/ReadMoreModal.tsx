@@ -65,7 +65,7 @@ export function ReadMoreModal({ isOpen, onClose, title, content }: ReadMoreModal
           {/* Fixed Footer */}
           <div className="mt-4 pt-4 border-t border-neutral-200 flex-shrink-0">
             <div className="flex justify-end">
-              <Button onClick={onClose}>Close</Button>
+              <Button onClick={onClose} className="bg-[#3980b7] text-white hover:bg-[#3980b7]/90">Close</Button>
             </div>
           </div>
         </CardContent>
