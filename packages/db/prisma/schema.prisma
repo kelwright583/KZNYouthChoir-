@@ -1,0 +1,587 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTH & USERS
+// ============================================
+
+enum UserRole {
+  SUPER_ADMIN
+  WEBSITE_EDITOR
+  EVENTS_COORDINATOR
+  CHOIR_ADMIN
+  BOARD_VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model AdminUser {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String
+  passwordHash  String
+  role          UserRole   @default(BOARD_VIEWER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  lastLoginAt   DateTime?
+
+  // Relations
+  auditLogs     AuditLog[]
+  createdNews   NewsPost[] @relation("NewsCreatedBy")
+  createdEvents Event[]    @relation("EventCreatedBy")
+  sentMessages  Message[]  @relation("MessageSentBy")
+  uploadedDocs  DocumentVersion[]
+
+  @@map("admin_users")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   // CREATE, UPDATE, DELETE, SEND_MESSAGE, etc.
+  entity     String   // NewsPost, Event, Contact, etc.
+  entityId   String?
+  diff       Json?    // Summary of changes
+  metadata   Json?    // Additional context
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user       AdminUser @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// CMS - PAGES & SECTIONS
+// ============================================
+
+model PageSection {
+  id        String   @id @default(cuid())
+  pageKey   String   // e.g., "about", "auditions"
+  sectionKey String  // e.g., "hero", "mission", "history"
+  content   Json     // Flexible content structure
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([pageKey, sectionKey])
+  @@index([pageKey])
+  @@map("page_sections")
+}
+
+// ============================================
+// CMS - HERO CAROUSEL
+// ============================================
+
+model CarouselSlide {
+  id          String    @id @default(cuid())
+  title       String?
+  subtitle    String?
+  imageUrl    String
+  ctaText     String?
+  ctaLink     String?
+  order       Int       @default(0)
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([order])
+  @@index([isActive, startDate, endDate])
+  @@map("carousel_slides")
+}
+
+// ============================================
+// CMS - NEWS
+// ============================================
+
+model NewsPost {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String    @db.Text
+  category    String?
+  tags        String[]  @default([])
+  featured    Boolean   @default(false)
+  pinned      Boolean   @default(false)
+  imageUrl    String?
+  publishAt   DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String
+
+  // Relations
+  createdBy   AdminUser @relation("NewsCreatedBy", fields: [createdById], references: [id])
+
+  @@index([slug])
+  @@index([publishAt, expiresAt])
+  @@index([featured, pinned])
+  @@map("news_posts")
+}
+
+// ============================================
+// CMS - EVENTS
+// ============================================
+
+enum EventType {
+  CONCERT
+  REHEARSAL
+  WORKSHOP
+  AUDITION
+  MEETING
+  OTHER
+}
+
+enum EventAudience {
+  PUBLIC
+  PRIVATE
+  MEMBERS_ONLY
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  type        EventType
+  audience    EventAudience @default(PUBLIC)
+  description String?       @db.Text
+  startDate   DateTime
+  endDate     DateTime?
+  callTime    DateTime?     // When choristers should arrive
+  venue       String?
+  venueAddress String?      @db.Text
+  ticketLink  String?
+  uniform     String?       @db.Text
+  whatToBring String?       @db.Text
+  notes       String?       @db.Text
+  flyerUrl    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdById String
+
+  // Relations
+  createdBy   AdminUser     @relation("EventCreatedBy", fields: [createdById], references: [id])
+  attachments MediaAsset[]  @relation("EventAttachments")
+  reminders   EventReminder[]
+
+  @@index([slug])
+  @@index([startDate, endDate])
+  @@index([audience, startDate])
+  @@map("events")
+}
+
+model EventReminder {
+  id          String   @id @default(cuid())
+  eventId     String
+  offsetDays  Int      // Days before event (e.g., 7, 2, 0)
+  templateId  String?  // Reference to message template
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([sentAt])
+  @@map("event_reminders")
+}
+
+// ============================================
+// CMS - SPONSORS
+// ============================================
+
+enum SponsorTier {
+  PLATINUM
+  GOLD
+  SILVER
+  BRONZE
+  FRIEND
+}
+
+model Sponsor {
+  id          String      @id @default(cuid())
+  name        String
+  tier        SponsorTier
+  logoUrl     String
+  websiteUrl  String?
+  description String?     @db.Text
+  featured    Boolean     @default(false)
+  order       Int         @default(0)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([tier, featured])
+  @@index([isActive, order])
+  @@map("sponsors")
+}
+
+// ============================================
+// CMS - MEDIA LIBRARY
+// ============================================
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  AUDIO
+}
+
+model MediaAsset {
+  id          String    @id @default(cuid())
+  type        MediaType
+  fileUrl     String
+  thumbUrl    String?   // For images/videos
+  altText     String?
+  caption     String?
+  tags        String[]  @default([])
+  metadata    Json?     // File size, dimensions, duration, etc.
+  createdAt   DateTime  @default(now())
+  createdById String?
+
+  // Relations
+  eventAttachments Event[] @relation("EventAttachments")
+  documentVersions DocumentVersion[]
+  messageAttachments Message[] @relation("MessageAttachments")
+
+  @@index([type])
+  @@index([createdAt])
+  @@map("media_assets")
+}
+
+// ============================================
+// CMS - NEWSLETTER
+// ============================================
+
+model Newsletter {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  contentHtml String?   @db.Text
+  pdfAssetId  String?   // Reference to MediaAsset if PDF
+  publishAt   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([publishAt])
+  @@map("newsletters")
+}
+
+// ============================================
+// CONTACTS & GROUPS
+// ============================================
+
+enum ContactType {
+  CHORISTER
+  PARENT_GUARDIAN
+  ALUMNI
+  SPONSOR
+  SUBSCRIBER
+  OTHER
+}
+
+model Contact {
+  id          String    @id @default(cuid())
+  type        ContactType
+  firstName   String?
+  lastName    String?
+  email       String?
+  phone       String?
+  address     String?   @db.Text
+  notes       String?   @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  choristerProfile ChoristerProfile?
+  guardianProfile  GuardianProfile?
+  groupMembers     GroupMember[]
+  messageRecipients MessageRecipient[]
+  requiredDocStatuses RequiredDocStatus[]
+
+  @@index([type])
+  @@index([email])
+  @@index([isActive])
+  @@map("contacts")
+}
+
+model ChoristerProfile {
+  id          String   @id @default(cuid())
+  contactId   String   @unique
+  dateOfBirth DateTime?
+  voicePart   String?  // Soprano, Alto, Tenor, Bass
+  cohort      String?  // Year joined
+  joinedDate  DateTime?
+  leftDate    DateTime?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([voicePart])
+  @@index([cohort])
+  @@map("chorister_profiles")
+}
+
+model GuardianProfile {
+  id          String   @id @default(cuid())
+  contactId   String   @unique
+  choristerId String   // Link to chorister Contact
+  relationship String? // Parent, Guardian, etc.
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([choristerId])
+  @@map("guardian_profiles")
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  type        String   // voice_part, cohort, ad_hoc, etc.
+  rules       Json?    // Auto-assignment rules (optional)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     GroupMember[]
+
+  @@index([type])
+  @@map("groups")
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  contactId String
+  addedAt   DateTime @default(now())
+
+  // Relations
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, contactId])
+  @@index([groupId])
+  @@index([contactId])
+  @@map("group_members")
+}
+
+// ============================================
+// COMMUNICATIONS
+// ============================================
+
+enum MessageChannel {
+  EMAIL
+  SMS
+}
+
+enum MessageStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  FAILED
+}
+
+model Message {
+  id          String          @id @default(cuid())
+  subject     String
+  body        String          @db.Text
+  channel     MessageChannel  @default(EMAIL)
+  status      MessageStatus   @default(DRAFT)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime        @default(now())
+  createdById String
+
+  // Relations
+  createdBy   AdminUser       @relation("MessageSentBy", fields: [createdById], references: [id])
+  recipients  MessageRecipient[]
+  attachments MediaAsset[]    @relation("MessageAttachments")
+
+  @@index([status, scheduledAt])
+  @@index([createdById])
+  @@map("messages")
+}
+
+model MessageRecipient {
+  id        String   @id @default(cuid())
+  messageId String
+  contactId String
+  status    String?  // sent, failed, bounced, etc.
+  sentAt    DateTime?
+  openedAt  DateTime?
+  clickedAt DateTime?
+
+  // Relations
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, contactId])
+  @@index([messageId])
+  @@index([contactId])
+  @@map("message_recipients")
+}
+
+model MessageTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  subject     String
+  body        String   @db.Text
+  channel     MessageChannel @default(EMAIL)
+  category    String?  // rehearsal_reminder, event_call_time, etc.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@map("message_templates")
+}
+
+// ============================================
+// DOCUMENTS
+// ============================================
+
+enum DocumentPermission {
+  PUBLIC
+  PARENTS_ONLY
+  BOARD_ONLY
+  STAFF_ONLY
+}
+
+model Document {
+  id          String            @id @default(cuid())
+  title       String
+  folder      String?           // Virtual folder path
+  permission  DocumentPermission @default(PARENTS_ONLY)
+  description String?           @db.Text
+  tags        String[]          @default([])
+  currentVersionId String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  versions    DocumentVersion[]
+
+  @@index([folder])
+  @@index([permission])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  fileAssetId String
+  version     Int      @default(1)
+  notes       String?  @db.Text
+  uploadedAt  DateTime @default(now())
+  uploadedById String?
+
+  // Relations
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fileAsset   MediaAsset @relation(fields: [fileAssetId], references: [id])
+  uploadedBy  AdminUser? @relation(fields: [uploadedById], references: [id])
+
+  @@index([documentId, version])
+  @@map("document_versions")
+}
+
+enum RequiredDocType {
+  INDEMNITY
+  CONSENT_FORM
+  ID_COPY
+  MEDICAL_INFO
+  PHOTO_CONSENT
+  OTHER
+}
+
+enum DocStatus {
+  NOT_REQUIRED
+  PENDING
+  RECEIVED
+  EXPIRED
+}
+
+model RequiredDocStatus {
+  id          String      @id @default(cuid())
+  choristerId String
+  docType     RequiredDocType
+  status      DocStatus   @default(PENDING)
+  dueDate     DateTime?
+  receivedAt  DateTime?
+  documentId  String?     // Link to Document if uploaded
+  notes       String?     @db.Text
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  chorister   Contact     @relation(fields: [choristerId], references: [id], onDelete: Cascade)
+
+  @@unique([choristerId, docType])
+  @@index([choristerId])
+  @@index([status, dueDate])
+  @@map("required_doc_statuses")
+}
+
+// ============================================
+// AUDITION SIGNUPS
+// ============================================
+
+model AuditionSignup {
+  id                    String   @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String
+  phone                 String?
+  dateOfBirth           DateTime?
+  voicePart             String?  // Soprano, Alto, Tenor, Bass, Unknown
+  previousExperience    String?  @db.Text
+  notes                 String?  @db.Text
+  agreedToTerms         Boolean  @default(false)
+  agreedToPromotional   Boolean  @default(false)
+  termsAgreedAt         DateTime?
+  promotionalAgreedAt   DateTime?
+  notifiedAt            DateTime? // When they were notified auditions opened
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([notifiedAt])
+  @@map("audition_signups")
+}
+
