@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@kzn-youth-choir/db'
-import { EventAudience } from '@kzn-youth-choir/db'
+import { EventAudience } from '@prisma/client'
 
 export async function GET(request: Request) {
   try {
