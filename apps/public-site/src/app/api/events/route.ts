@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@kzn-youth-choir/db'
-import { Prisma } from '@prisma/client'
+import { EventAudience } from '@prisma/client'
 
 export async function GET(request: Request) {
   try {
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const now = new Date()
     
     let where: any = {
-      audience: audience as Prisma.EventAudience,
+      audience: audience as EventAudience,
     }
 
     if (filter === 'upcoming') {

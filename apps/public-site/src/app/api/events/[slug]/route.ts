@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@kzn-youth-choir/db'
-import { Prisma } from '@prisma/client'
+import { EventAudience } from '@prisma/client'
 
 export async function GET(
   request: Request,
@@ -10,7 +10,7 @@ export async function GET(
     const event = await prisma.event.findFirst({
       where: {
         slug: params.slug,
-        audience: Prisma.EventAudience.PUBLIC,
+        audience: EventAudience.PUBLIC,
       },
       include: {
         attachments: true,
