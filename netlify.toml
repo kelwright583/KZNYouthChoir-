@@ -1,7 +1,6 @@
 [build]
-  base = "apps/public-site"
-  command = "cd .. && pnpm install && pnpm build --filter=@kzn-youth-choir/public-site"
-  publish = ".next"
+  command = "pnpm install && pnpm build --filter=@kzn-youth-choir/public-site"
+  publish = "apps/public-site/.next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
