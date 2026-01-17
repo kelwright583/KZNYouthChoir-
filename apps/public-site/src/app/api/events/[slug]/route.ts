@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
-    const event = await prisma.event.findUnique({
+    const event = await prisma.event.findFirst({
       where: {
         slug: params.slug,
         audience: Prisma.EventAudience.PUBLIC,
