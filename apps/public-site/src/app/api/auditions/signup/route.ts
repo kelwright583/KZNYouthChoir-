@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     }
 
     // Check if email already exists
-    const existing = await prisma.auditionSignup.findUnique({
+    const existing = await prisma.auditionSignup.findFirst({
       where: { email },
     })
 
